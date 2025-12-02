@@ -56,8 +56,8 @@ st.title("🚗 Predicción de Demanda y Optimización de Flota")
 st.markdown("### Forecasting inteligente y reubicación de vehículos para maximizar ingresos.")
 
 # --- Tabs ---
-tab_intro, tab_data, tab_forecast, tab_map, tab_opt, tab_compare = st.tabs(
-    ["📚 Introducción", "📊 Datos", "📈 Predicción", "🗺️ Mapa", "🚚 Optimización", "⚖️ Comparación"]
+tab_intro, tab_data, tab_forecast, tab_map, tab_opt = st.tabs(
+    ["📚 Introducción", "📊 Datos", "📈 Predicción", "🗺️ Mapa", "🚚 Optimización"]
 )
 
 # --- Tab 1: Intro ---
@@ -879,14 +879,9 @@ with tab_opt:
                 "lambda_pen": lambda_pen,
             }
 
-        if st.session_state.opt_results is not None:
-            meta = st.session_state.opt_results
-            st.caption(
-                f"Mostrando resultados para ventana {meta['start_date'].strftime('%Y-%m-%d')} → {meta['end_date'].strftime('%Y-%m-%d')} (λ={meta['lambda_pen']:.1f})."
-            )
-            render_opt_results(meta["moves"], meta["res_df"], meta["total_demand_agg"])
-
-# --- Tab 6: Comparison ---
-with tab_compare:
-    st.header("Comparativa de Modelos")
-    st.info("Entrena ambos modelos en la pestaña 'Predicción' para ver la comparativa aquí (Feature pendiente de implementación completa).")
+if st.session_state.opt_results is not None:
+    meta = st.session_state.opt_results
+    st.caption(
+        f"Mostrando resultados para ventana {meta['start_date'].strftime('%Y-%m-%d')} → {meta['end_date'].strftime('%Y-%m-%d')} (λ={meta['lambda_pen']:.1f})."
+    )
+    render_opt_results(meta["moves"], meta["res_df"], meta["total_demand_agg"])
