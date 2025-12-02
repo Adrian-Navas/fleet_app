@@ -22,16 +22,26 @@ Aplicación educativa en **Streamlit** para simular una red de estaciones de alq
 - Dependencias del sistema para `geopy`, `statsmodels` y `xgboost` (instalables vía `apt` en la mayoría de entornos Linux).
 
 ## Instalación y ejecución
-1. Clona el repositorio y crea un entorno virtual opcional.
-2. Instala dependencias:
+1. Clona el repositorio y crea un entorno virtual (recomendado) con `venv` o `conda`:
+   ```bash
+   # Con venv
+   python -m venv .venv
+   source .venv/bin/activate
+
+   # Con conda
+   conda create -n fleet_app python=3.10 -y
+   conda activate fleet_app
+   ```
+2. Instala dependencias dentro del entorno activado:
    ```bash
    pip install -r requirements.txt
    ```
-3. Lanza la aplicación Streamlit:
+3. Lanza la aplicación Streamlit desde la raíz del repo:
    ```bash
    streamlit run app.py
    ```
-4. En la barra lateral, pulsa **"Generar Datos Mock"**, entrena un modelo en la pestaña **Predicción** y navega por las pestañas **Mapa** y **Optimización** para ver resultados.
+4. Abre el enlace local que muestra la consola (habitualmente http://localhost:8501).
+5. En la barra lateral, pulsa **"Generar Datos Mock"**, entrena un modelo en la pestaña **Predicción** y navega por las pestañas **Mapa** y **Optimización** para ver resultados.
 
 ## Flujo de trabajo sugerido
 1. **Generar datos**: crea la red de estaciones y 2 años de demanda diaria con lags y variables de calendario.【F:data_generator.py†L63-L122】
