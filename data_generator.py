@@ -2,9 +2,12 @@ import pandas as pd
 import numpy as np
 from datetime import timedelta
 
-def generate_stations():
+def generate_stations(capacity_factor: float = 1.0):
     """
     Generates a list of 50+ stations in Spain.
+
+    Args:
+        capacity_factor: Multiplicative factor applied to every station capacity.
     """
     # Simplified list of major cities/locations
     # Capacity reduced by 20% as per request to increase utilization pressure
@@ -42,14 +45,18 @@ def generate_stations():
     expanded_stations = []
     count = 1
     for s in stations_data:
+        scaled_capacity = int(round(s["capacity"] * capacity_factor))
+
         expanded_stations.append({
             "station_id": count,
             "station_name": f"{s['city']} Central",
             **s
         })
+        expanded_stations[-1]["capacity"] = scaled_capacity
         count += 1
         # Add secondary stations for big cities
         if s["base_demand"] > 80 and s["segment"] == "City":
+            secondary_capacity = int(round(scaled_capacity * 0.6))
             expanded_stations.append({
                 "station_id": count,
                 "station_name": f"{s['city']} North",
@@ -57,7 +64,7 @@ def generate_stations():
                 "lat": s["lat"] + 0.02,
                 "lon": s["lon"] + 0.02,
                 "base_demand": s["base_demand"] * 0.6,
-                "capacity": int(s["capacity"] * 0.6),
+                "capacity": secondary_capacity,
                 "segment": "City"
             })
             count += 1

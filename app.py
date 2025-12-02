@@ -28,11 +28,20 @@ if "opt_results" not in st.session_state:
 # --- Sidebar ---
 with st.sidebar:
     st.title("⚙️ Configuración")
+    capacity_factor = st.number_input(
+        "Factor multiplicativo de capacidad",
+        min_value=0.1,
+        max_value=5.0,
+        value=1.0,
+        step=0.1,
+        help="Escala la capacidad base de todas las estaciones (1 = capacidad original)."
+    )
+
     if st.button("Generar Datos Mock"):
         with st.spinner("Generando red de estaciones y demanda..."):
-            stations = generate_stations()
+            stations = generate_stations(capacity_factor=capacity_factor)
             demand = generate_daily_demand(stations)
-            
+
             st.session_state.stations = stations
             st.session_state.demand = demand
             st.session_state.data_loaded = True
