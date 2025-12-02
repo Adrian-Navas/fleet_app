@@ -22,6 +22,8 @@ if "data_loaded" not in st.session_state:
     st.session_state.data_loaded = False
 if "model_trained" not in st.session_state:
     st.session_state.model_trained = False
+if "opt_results" not in st.session_state:
+    st.session_state.opt_results = None
 
 # --- Sidebar ---
 with st.sidebar:
@@ -677,18 +679,14 @@ with tab_opt:
             total_fleet = sum(current_dict.values())
             total_demand_agg = agg_demand.sum()
             avg_daily_demand = total_demand_agg / 90
-            
+
             st.metric("Total Flota Disponible", f"{total_fleet} coches")
             st.metric("Demanda Total (3 meses)", f"{int(total_demand_agg)} alquileres")
             st.metric("Demanda Promedio Diaria", f"{int(avg_daily_demand)} alquileres/día")
-        
-        if st.button("🚀 Ejecutar Optimizador Estratégico", type="primary"):
-            optimizer = FleetOptimizer(st.session_state.stations)
-            with st.spinner("Resolviendo optimización a 3 meses..."):
-                moves, res_df = optimizer.solve_relocation_longterm(current_dict, future_window, lambda_pen)
-                
+
+        def render_opt_results(moves, res_df, total_demand_val):
             st.success(f"✅ Optimización completada. Se proponen **{len(moves)} movimientos estratégicos**.")
-            
+
             col1, col2 = st.columns(2)
             with col1:
                 st.subheader("🚗 Movimientos Propuestos")
@@ -698,7 +696,7 @@ with tab_opt:
                     # Sort by amount descending
                     moves_df = moves_df.sort_values("Coches", ascending=False)
                     st.dataframe(moves_df, use_container_width=True)
-                    
+
                     # Show summary
                     st.markdown("**Resumen de Movimientos:**")
                     st.write(f"- **Total movimientos**: {len(moves)}")
@@ -706,7 +704,7 @@ with tab_opt:
                     st.write(f"- **Distancia promedio**: {moves_df['Distancia (km)'].mean():.1f} km")
                 else:
                     st.info("✨ No es necesario mover coches. La distribución actual es óptima para los próximos 3 meses.")
-                    
+
             with col2:
                 st.subheader("📊 Estado Final por Estación")
                 display_df = res_df[["station_name", "initial", "final", "target_aggregate", "shortfall"]].copy()
@@ -716,56 +714,56 @@ with tab_opt:
                 display_df = display_df[
                     (display_df["Cambio"] != 0) | (display_df["Déficit 3M"] > 0)
                 ].sort_values("Déficit 3M", ascending=False)
-                
+
                 if len(display_df) > 0:
                     st.dataframe(display_df, use_container_width=True)
                 else:
                     st.info("Todas las estaciones mantienen su flota actual.")
-                
+
             # Metrics
             st.markdown("---")
             st.subheader("📈 Métricas de Optimización")
             col_m1, col_m2, col_m3, col_m4 = st.columns(4)
-            
+
             total_cost = sum(m["cost"] for m in moves)
             total_shortfall = res_df["shortfall"].sum()
             total_moved = sum(m["amount"] for m in moves)
-            coverage = ((total_demand_agg - total_shortfall) / total_demand_agg * 100) if total_demand_agg > 0 else 100
-            
+            coverage = ((total_demand_val - total_shortfall) / total_demand_val * 100) if total_demand_val > 0 else 100
+
             col_m1.metric("Distancia Total", f"{total_cost:.0f} km", help="Suma de distancias × coches movidos")
             col_m2.metric("Demanda No Cubierta", f"{int(total_shortfall)} alquileres", help="Demanda total que no podrá ser atendida en 3 meses")
             col_m3.metric("Coches Movidos", f"{int(total_moved)}", help="Total de coches a redistribuir")
             col_m4.metric("Cobertura", f"{coverage:.1f}%", help="% de demanda cubierta en el período")
-            
+
             # Visualization: Demand vs Capacity
             st.markdown("---")
             st.subheader("📊 Análisis de Cobertura por Estación")
-            
+
             viz_df = res_df.copy()
             viz_df["capacity_3m"] = viz_df["capacity_aggregate"]
             viz_df["demand_3m"] = viz_df["target_aggregate"]
             viz_df["supply_3m"] = viz_df["final"] * 90
-            
+
             # Top 10 stations by demand
             top_stations = viz_df.nlargest(10, "demand_3m")
-            
+
             import plotly.graph_objects as go
             fig_coverage = go.Figure()
-            
+
             fig_coverage.add_trace(go.Bar(
                 name='Demanda (3M)',
                 x=top_stations['station_name'],
                 y=top_stations['demand_3m'],
                 marker_color='lightblue'
             ))
-            
+
             fig_coverage.add_trace(go.Bar(
                 name='Oferta (3M)',
                 x=top_stations['station_name'],
                 y=top_stations['supply_3m'],
                 marker_color='darkblue'
             ))
-            
+
             fig_coverage.update_layout(
                 title="Top 10 Estaciones: Demanda vs Oferta (3 Meses)",
                 xaxis_title="Estación",
@@ -773,17 +771,17 @@ with tab_opt:
                 barmode='group',
                 height=400
             )
-            
+
             st.plotly_chart(fig_coverage, use_container_width=True)
-            
+
             # Map Visualization with Movement Arrows
             st.markdown("---")
             st.subheader("🗺️ Mapa de Movimientos de Flota")
-            
+
             if moves:
                 # Create map centered on Spain
                 m_moves = folium.Map(location=[40.0, -3.7], zoom_start=6)
-                
+
                 # Add all stations as markers
                 for _, station in st.session_state.stations.iterrows():
                     folium.CircleMarker(
@@ -795,7 +793,7 @@ with tab_opt:
                         fillOpacity=0.6,
                         popup=station["station_name"]
                     ).add_to(m_moves)
-                
+
                 # Add arrows for movements
                 for move in moves:
                     from_station = st.session_state.stations[
@@ -804,14 +802,14 @@ with tab_opt:
                     to_station = st.session_state.stations[
                         st.session_state.stations["station_id"] == move["to_id"]
                     ].iloc[0]
-                    
+
                     from_loc = [from_station["lat"], from_station["lon"]]
                     to_loc = [to_station["lat"], to_station["lon"]]
-                    
+
                     # Arrow thickness based on number of cars
                     # Scale: 1-5 cars -> 2px, 6-10 -> 4px, 11+ -> 6px
                     weight = 2 if move["amount"] <= 5 else (4 if move["amount"] <= 10 else 6)
-                    
+
                     # Color intensity based on amount
                     if move["amount"] <= 5:
                         color = "#FF6B6B"  # Light red
@@ -819,7 +817,7 @@ with tab_opt:
                         color = "#FF4444"  # Medium red
                     else:
                         color = "#CC0000"  # Dark red
-                    
+
                     # Draw arrow using PolyLine
                     arrow = folium.PolyLine(
                         locations=[from_loc, to_loc],
@@ -829,7 +827,7 @@ with tab_opt:
                         popup=f"<b>{move['from_name']}</b> → <b>{move['to_name']}</b><br>🚗 {move['amount']} coches<br>📏 {move['cost']:.1f} km"
                     )
                     arrow.add_to(m_moves)
-                    
+
                     # Add directional arrow using plugins.AntPath for animation
                     from folium import plugins
                     plugins.AntPath(
@@ -840,7 +838,7 @@ with tab_opt:
                         delay=800,
                         dash_array=[10, 20]
                     ).add_to(m_moves)
-                    
+
                     # Add destination marker (larger circle)
                     folium.CircleMarker(
                         location=to_loc,
@@ -851,12 +849,33 @@ with tab_opt:
                         fillOpacity=0.8,
                         popup=f"<b>Destino:</b> {move['to_name']}<br>🚗 Recibe {move['amount']} coches"
                     ).add_to(m_moves)
-                
+
                 st_folium(m_moves, width=800, height=600)
-                
+
                 st.caption("🔴 Las flechas animadas indican movimientos de coches. El grosor representa la cantidad de coches trasladados.")
             else:
                 st.info("No hay movimientos que visualizar (la distribución actual es óptima).")
+
+        if st.button("🚀 Ejecutar Optimizador Estratégico", type="primary"):
+            optimizer = FleetOptimizer(st.session_state.stations)
+            with st.spinner("Resolviendo optimización a 3 meses..."):
+                moves, res_df = optimizer.solve_relocation_longterm(current_dict, future_window, lambda_pen)
+
+            st.session_state.opt_results = {
+                "moves": moves,
+                "res_df": res_df,
+                "total_demand_agg": float(total_demand_agg),
+                "start_date": start_date,
+                "end_date": end_date,
+                "lambda_pen": lambda_pen,
+            }
+
+        if st.session_state.opt_results is not None:
+            meta = st.session_state.opt_results
+            st.caption(
+                f"Mostrando resultados para ventana {meta['start_date'].strftime('%Y-%m-%d')} → {meta['end_date'].strftime('%Y-%m-%d')} (λ={meta['lambda_pen']:.1f})."
+            )
+            render_opt_results(meta["moves"], meta["res_df"], meta["total_demand_agg"])
 
 # --- Tab 6: Comparison ---
 with tab_compare:
